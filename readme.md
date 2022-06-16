@@ -1,19 +1,19 @@
 # Spring PetClinic Sample Application [![Build Status](https://github.com/spring-projects/spring-petclinic/actions/workflows/maven-build.yml/badge.svg)](https://github.com/spring-projects/spring-petclinic/actions/workflows/maven-build.yml)
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/spring-projects/spring-petclinic)
-
 ## Understanding the Spring Petclinic application with a few diagrams
 <a href="https://speakerdeck.com/michaelisvy/spring-petclinic-sample-application">See the presentation here</a>
 
-## Running petclinic locally
-Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) application built using [Maven](https://spring.io/guides/gs/maven/). You can build a jar file and run it from the command line (it should work just as well with Java 11 or newer):
+## Running petclinic docker image
+Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) application built using [Maven](https://spring.io/guides/gs/maven/). You can download 
+[Docker Image](https://drive.google.com/drive/folders/1pIBPjXu49tUY2rJpfHLJYHvOULPG5KSn?usp=sharing) and run it from the command line (requires docker daemon):
+
 
 
 ```
-git clone https://github.com/spring-projects/spring-petclinic.git
-cd spring-petclinic
-./mvnw package
-java -jar target/*.jar
+docker load < petclinic_latest.tar.gzcd
+```
+```
+docker run -d -p 8080:8080 petclinic:latest
 ```
 
 You can then access petclinic here: http://localhost:8080/
@@ -30,12 +30,69 @@ Or you can run it from Maven directly using the Spring Boot Maven plugin. If you
 
 > NOTE: If you prefer to use Gradle, you can build the app using `./gradlew build` and look for the jar file in `build/libs`.
 
-## Building a Container
+## Dockerfile
 
-There is no `Dockerfile` in this project. You can build a container image (if you have a docker daemon) using the Spring Boot build plugin:
+Here is a sample `Dockerfile` in this project. You can build a docker image within Jenkins pipeline if you have a docker daemon:
 
 ```
-./mvnw spring-boot:build-image
+# syntax=docker/dockerfile:1
+FROM anapsix/alpine-java
+LABEL maintainer="jaycpanchal@gmail.com" 
+COPY /target/spring-petclinic-2.7.0-SNAPSHOT.jar /container/spring-petclinic-2.7.0-SNAPSHOT.jar
+CMD ["java","-jar","/container/spring-petclinic-2.7.0-SNAPSHOT.jar"]
+```
+
+## Building Jenkins Pipeline
+
+Jenkins pipeline consists of 4 stages:
+
+Stage 1: Clone [spring-petclinic](https://github.com/spring-projects/spring-petclinic) repository
+
+```
+        stage('Clone') {
+            steps {
+                echo 'Clone'
+                git branch: 'main', url: 'https://github.com/spring-projects/spring-petclinic.git'
+            }
+        }
+```
+Stage 2: Install application using [Maven](https://spring.io/guides/gs/maven/)
+
+```
+        stage('Install') {
+            steps {
+                echo 'Install application'
+                bat 'mvn clean install'
+            }
+        }
+```
+
+Stage 3: Build `Docker` image. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) if you haven't already.
+
+```
+        stage('Docker Build') {
+            steps {
+                echo 'Build Docker Image'
+                bat 'docker build -t petclinic:latest .'
+            }
+        }
+```
+
+Stage 4: Publish BuildInfo to [JFrog Artifactory](https://jfrog.com/artifactory/).
+
+```
+        stage('Publish') {
+            steps {
+                echo 'Publish'
+				rtPublishBuildInfo (
+					serverId: 'artifictory-server',
+					// If the build name and build number are not set here, the current job name and number will be used. Make sure to use the same value used in the rtDockerPull and/or rtDockerPush steps.
+					buildName: 'my-test-build',
+					buildNumber: '2',
+					// Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
+					//project: 'my-project-key',
+				)            }
+        }
 ```
 
 ## In case you find a bug/suggested improvement for Spring Petclinic
@@ -84,19 +141,80 @@ The following items should be installed in your system:
 
 ### Steps:
 
-1) On the command line
+Step 1: Install Java 
+
     ```
     git clone https://github.com/spring-projects/spring-petclinic.git
     ```
-2) Inside Eclipse or STS
+
+Step 2: Install Jenkins
+
     ```
     File -> Import -> Maven -> Existing Maven project
     ```
 
-    Then either build on the command line `./mvnw generate-resources` or using the Eclipse launcher (right click on project and `Run As -> Maven install`) to generate the css. Run the application main method by right clicking on it and choosing `Run As -> Java Application`.
+Step 3: Install Plugins
 
-3) Inside IntelliJ IDEA
-    In the main menu, choose `File -> Open` and select the Petclinic [pom.xml](pom.xml). Click on the `Open` button.
+	i)   	Artifactory plugin
+	
+	ii)  	Pipeline Maven Integration plugin
+	
+	iii) 	Git plugin
+	
+	iv)  	CloudBees Docker Build and Publish plugin
+	
+Step 4: Configure Jenkins 
+
+	i)	Configure global settings and paths.
+	
+	ii)	Configure tools, their locations and automatic installers.
+
+Step 5: Create a new `Pipeline` project and use following Pipeline script
+
+   ```
+
+   pipeline {
+	    agent any
+
+	    stages {
+		stage('Clone') {
+		    steps {
+			echo 'Clone'
+			git branch: 'main', url: 'https://github.com/spring-projects/spring-petclinic.git'
+		    }
+		}
+		stage('Install') {
+		    steps {
+			echo 'Install application'
+			bat 'mvn clean install'
+		    }
+		}
+		stage('Docker Build') {
+		    steps {
+			echo 'Build'
+			bat 'docker build -t petclinic:latest .'
+		    }
+		}
+		stage('Publish') {
+		    steps {
+			echo 'Publish'
+					rtPublishBuildInfo (
+						serverId: 'artifictory-server',
+						// If the build name and build number are not set here, the current job name and number will be used. 
+						// Make sure to use the same value used in the rtDockerPull and/or rtDockerPush steps.
+						buildName: 'my-test-build',
+						buildNumber: '2',
+						// Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
+						//project: 'my-project-key',
+					)            }
+		}
+	    }
+	}
+   ```
+
+
+
+In the main menu, choose `File -> Open` and select the Petclinic [pom.xml](pom.xml). Click on the `Open` button.
 
     CSS files are generated from the Maven build. You can either build them on the command line `./mvnw generate-resources` or right click on the `spring-petclinic` project then `Maven -> Generates sources and Update Folders`.
 
