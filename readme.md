@@ -10,7 +10,7 @@ Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) applicatio
 
 
 ```
-docker load < petclinic_latest.tar.gzcd
+docker load < petclinic_latest.tar.gz
 ```
 ```
 docker run -d -p 8080:8080 petclinic:latest
