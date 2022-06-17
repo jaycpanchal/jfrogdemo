@@ -4,10 +4,93 @@
 <a href="https://speakerdeck.com/michaelisvy/spring-petclinic-sample-application">See the presentation here</a>
 
 ## Running petclinic docker image
+
+### Steps:
+
+Step 1: Install Java 
+
+```
+https://www.oracle.com/java/technologies/javase/jdk11-archive-downloads.html
+```
+Step 2: Install Jenkins
+
+```
+https://www.jenkins.io/download/
+```
+
+Step 3: Install Plugins
+
+	i)   	Artifactory plugin
+	
+	ii)  	Pipeline Maven Integration plugin
+	
+	iii) 	Git plugin
+	
+	iv)  	CloudBees Docker Build and Publish plugin
+	
+Step 4: Configure Jenkins 
+
+	i)	Configure global settings and paths.
+	
+	ii)	Configure tools, their locations and automatic installers.
+
+Step 5: Create a new `Pipeline` project and use following Pipeline script / `Jenkinsfile`
+
+   ```
+
+   pipeline {
+	    agent any
+
+	    stages {
+		stage('Clone') {
+		    steps {
+			echo 'Clone'
+			git branch: 'main', url: 'https://github.com/spring-projects/spring-petclinic.git'
+		    }
+		}
+		stage('Install') {
+		    steps {
+			echo 'Install application'
+			bat 'mvn clean install'
+		    }
+		}
+		stage('Docker Build') {
+		    steps {
+			echo 'Build'
+			bat 'docker build -t petclinic:latest .'
+		    }
+		}
+		stage('Publish') {
+		    steps {
+			echo 'Publish'
+					rtPublishBuildInfo (
+						serverId: 'artifictory-server',
+						// If the build name and build number are not set here, the current job name and number will be used. 
+						// Make sure to use the same value used in the rtDockerPull and/or rtDockerPush steps.
+						buildName: 'my-test-build',
+						buildNumber: '2',
+						// Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
+						//project: 'my-project-key',
+					)            }
+		}
+	    }
+	}
+   ```
+
+> NOTE: Windows users should set `git config core.autocrlf true` to avoid format assertions failing the build (use `--global` to set that flag globally).
+
+Step 6: Save runnable docker image 
+
+```
+docker save petclinic:latest | gzip > petclinic_latest.tar.gz
+
+```
+
 Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) application built using [Maven](https://spring.io/guides/gs/maven/). You can download 
 [Docker Image](https://drive.google.com/drive/folders/1pIBPjXu49tUY2rJpfHLJYHvOULPG5KSn?usp=sharing) and run it from the command line (requires docker daemon):
 
 
+Step 7: Load and run petclinic docker image 
 
 ```
 docker load < petclinic_latest.tar.gz
@@ -20,13 +103,6 @@ You can then access petclinic here: http://localhost:8080/
 
 <img width="1042" alt="petclinic-screenshot" src="https://cloud.githubusercontent.com/assets/838318/19727082/2aee6d6c-9b8e-11e6-81fe-e889a5ddfded.png">
 
-Or you can run it from Maven directly using the Spring Boot Maven plugin. If you do this it will pick up changes that you make in the project immediately (changes to Java source files require a compile as well - most people use an IDE for this):
-
-```
-./mvnw spring-boot:run
-```
-
-> NOTE: Windows users should set `git config core.autocrlf true` to avoid format assertions failing the build (use `--global` to set that flag globally).
 
 > NOTE: If you prefer to use Gradle, you can build the app using `./gradlew build` and look for the jar file in `build/libs`.
 
@@ -138,79 +214,6 @@ The following items should be installed in your system:
   * [Spring Tools Suite](https://spring.io/tools) (STS)
   * IntelliJ IDEA
   * [VS Code](https://code.visualstudio.com)
-
-### Steps:
-
-Step 1: Install Java 
-
-    ```
-    git clone https://github.com/spring-projects/spring-petclinic.git
-    ```
-
-Step 2: Install Jenkins
-
-    ```
-    File -> Import -> Maven -> Existing Maven project
-    ```
-
-Step 3: Install Plugins
-
-	i)   	Artifactory plugin
-	
-	ii)  	Pipeline Maven Integration plugin
-	
-	iii) 	Git plugin
-	
-	iv)  	CloudBees Docker Build and Publish plugin
-	
-Step 4: Configure Jenkins 
-
-	i)	Configure global settings and paths.
-	
-	ii)	Configure tools, their locations and automatic installers.
-
-Step 5: Create a new `Pipeline` project and use following Pipeline script
-
-   ```
-
-   pipeline {
-	    agent any
-
-	    stages {
-		stage('Clone') {
-		    steps {
-			echo 'Clone'
-			git branch: 'main', url: 'https://github.com/spring-projects/spring-petclinic.git'
-		    }
-		}
-		stage('Install') {
-		    steps {
-			echo 'Install application'
-			bat 'mvn clean install'
-		    }
-		}
-		stage('Docker Build') {
-		    steps {
-			echo 'Build'
-			bat 'docker build -t petclinic:latest .'
-		    }
-		}
-		stage('Publish') {
-		    steps {
-			echo 'Publish'
-					rtPublishBuildInfo (
-						serverId: 'artifictory-server',
-						// If the build name and build number are not set here, the current job name and number will be used. 
-						// Make sure to use the same value used in the rtDockerPull and/or rtDockerPush steps.
-						buildName: 'my-test-build',
-						buildNumber: '2',
-						// Optional - Only if this build is associated with a project in Artifactory, set the project key as follows.
-						//project: 'my-project-key',
-					)            }
-		}
-	    }
-	}
-   ```
 
 
 
